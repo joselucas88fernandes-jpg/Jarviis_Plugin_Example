@@ -1,184 +1,211 @@
-# JARVIS PLUGIN STANDARD (ABI v1)
+JARVIS PLUGIN STANDARD (ABI v1.1)
+⚠️ IMPORTANT RULE
 
-This document defines the official structure, rules, and execution model for all plugins compatible with the Jarvis Kernel.
+This document defines the official execution contract for all Jarvis plugins.
 
-Any plugin that does not follow these rules will be rejected by the loader.
+Any plugin that violates this specification:
 
----
+will be rejected by the loader
+will NOT be executed
+will NOT be eligible for marketplace verification
 
-# 1. PURPOSE
+Plugins are not applications.
+Plugins are controlled execution modules inside the Jarvis Kernel.
 
-A Jarvis plugin is a modular execution unit that extends the capabilities of the Jarvis Kernel.
+1. PURPOSE
 
-Plugins MUST be:
-- deterministic
-- isolated in logic
-- contract-based
-- execution-safe
+A Jarvis plugin is a modular capability unit that extends the Kernel safely and predictably.
 
-Plugins are NOT allowed to:
-- control the kernel directly
-- execute system-level operations without restrictions
-- bypass the execution contract
-- modify other plugins
+Plugins exist to:
 
----
+process user input
+execute constrained logic
+return structured outputs
+optionally interact with tools (if explicitly allowed)
 
-# 2. REQUIRED STRUCTURE
+Plugins MUST NOT behave as independent systems.
+
+2. CORE DESIGN PRINCIPLES
+
+Every plugin MUST follow:
+
+🔒 Isolation-first execution
+📦 Stateless design (unless memory is provided)
+⚙️ Deterministic behavior (same input → same output)
+🧱 Contract-based communication only
+🚫 No uncontrolled side effects
+3. REQUIRED DIRECTORY STRUCTURE
+
+Every plugin MUST follow exactly this structure:
+
 plugin_name/
 │
-├── manifest.json
-├── main.py
-├── instructions.md (optional but recommended)
-├── requirements.txt (optional)
-└── assets/ (optional folder for static files)
+├── manifest.json          # REQUIRED
+├── main.py                # REQUIRED (entry point)
+├── instructions.md        # RECOMMENDED (human + AI usage guide)
+├── requirements.txt       # OPTIONAL
+└── assets/                # OPTIONAL (static files only)
+4. MANDATORY FILES
+4.1 manifest.json (REQUIRED)
 
+Defines plugin identity, behavior, and routing rules.
 
----
-
-# 3. MANDATORY FILES
-
-## 3.1 manifest.json (REQUIRED)
-
-Defines the plugin identity and routing rules.
-
-Must include:
-
-- name (string)
-- version (string)
-- min_kernel_version (string)
-- entry (must be "main.py")
-- triggers (list of strings)
-- priority (integer)
-- type (core | tool | brain | memory | utility)
-- description (string)
-
----
-
-## 3.2 main.py (REQUIRED)
-
-Must expose exactly one function:
-
-```python
-def execute(skill_input) -> SkillOutput
-
+Required fields:
+{
+  "name": "string",
+  "version": "MAJOR.MINOR.PATCH",
+  "min_kernel_version": "string",
+  "entry": "main.py",
+  "type": "core | tool | brain | memory | utility",
+  "priority": "integer",
+  "triggers": ["string"],
+  "description": "string"
+}
 Rules:
-Must not execute code outside the function scope
-Must not access system resources directly
-Must return ONLY SkillOutput object
-Must not return raw strings or unstructured data
-Must be stateless unless memory is explicitly provided
-4. EXECUTION CONTRACT
-Input Object (SkillInput)
+entry MUST be "main.py"
+triggers MUST be a non-empty list of strings
+priority affects routing score only (not execution guarantee)
+type defines plugin classification for future marketplace filtering
+4.2 main.py (REQUIRED)
+
+Must expose EXACTLY this function:
+
+def execute(skill_input) -> SkillOutput:
+Execution Rules:
+MUST NOT execute code outside execute()
+MUST NOT use global state unless explicitly designed
+MUST return ONLY SkillOutput
+MUST NOT return raw strings, dicts, or objects outside contract
+5. EXECUTION CONTRACT
+Input (SkillInput)
 
 Each plugin receives:
 
 user_input: str
 context: dict
 memory: dict
-Output Object (SkillOutput)
+Output (SkillOutput)
 
-Each plugin MUST return:
+Must strictly follow:
 
 success: bool
 response: str
 actions: list[str]
 metadata: dict
-5. SECURITY RULES (STRICT)
+Rules:
+response is the only user-facing output
+actions are optional system signals (e.g. ["save_memory"])
+metadata is for debugging, logs, tracing
+6. SECURITY MODEL (STRICT)
 
 Plugins MUST NOT:
 
-access filesystem outside their folder
-perform network calls without explicit design permission
-execute subprocess/system commands
-import unsafe or dynamic execution libraries (eval, exec, etc.)
-modify kernel state directly
+❌ access files outside plugin directory
+❌ use eval, exec, or dynamic code execution
+❌ spawn subprocesses or system commands
+❌ perform network calls unless explicitly allowed in future ABI extension
+❌ modify kernel state directly
+❌ import unauthorized system-level modules
 
-Any violation results in plugin rejection.
+Any violation = automatic rejection by loader
 
-6. ROUTING BEHAVIOR
+7. ROUTING SYSTEM
 
-Plugins are triggered via:
+Plugins are selected via scoring engine:
 
-exact match triggers
-partial match triggers
-semantic overlap scoring
+Priority order:
 
-The router selects the highest scoring plugin.
+Exact trigger match (highest priority)
+Partial match (substring)
+Word overlap scoring
 
-7. PRIORITY SYSTEM
+Kernel selects the highest scoring plugin only
 
-Each plugin has a priority field:
+8. PRIORITY SYSTEM
+priority: integer
 
-Higher priority overrides weak matches
-Priority is NOT a guarantee of execution
-Only affects scoring weight
-8. OPTIONAL COMPONENTS
-8.1 instructions.md (this file)
+Rules:
 
-Used by future AI Main Nodes to understand:
+Higher value increases likelihood of selection
+Does NOT guarantee execution
+Only affects routing score weighting
+9. OPTIONAL COMPONENTS
+9.1 instructions.md (RECOMMENDED)
 
-intent of plugin
-usage conditions
+Used by:
+
+AI Main Nodes
+plugin developers
+future auto-documentation systems
+
+Should describe:
+
+plugin behavior
+usage examples
 constraints
-behavior expectations
-8.2 requirements.txt
+expected outputs
+9.2 requirements.txt (OPTIONAL)
 
 Defines Python dependencies.
 
-Installed in isolated environment per plugin (future sandbox model).
+⚠️ Future rule:
+Each plugin will be installed in an isolated environment (sandbox-ready architecture).
 
-8.3 assets/
+9.3 assets/ (OPTIONAL)
 
 Static resources only:
 
+Allowed:
+
 images
+configs
 models
-config files
+templates
 
-No executable code allowed inside assets.
+Not allowed:
 
-9. VERSIONING RULES
+executable code
+scripts
+hidden logic
+10. VERSIONING RULES
 
-Plugins MUST follow semantic versioning:
+Plugins MUST follow:
 
 MAJOR.MINOR.PATCH
+MAJOR → breaking changes
+MINOR → new features
+PATCH → bug fixes
+11. COMPATIBILITY
 
-MAJOR: breaking changes
-MINOR: new features
-PATCH: fixes
-10. COMPATIBILITY
-
-Plugins must define:
+Each plugin MUST define:
 
 min_kernel_version
 
-The kernel will reject incompatible plugins.
+Kernel will reject incompatible plugins automatically.
 
-11. ERROR HANDLING
+12. ERROR HANDLING
 
-Plugins MUST never crash the kernel.
+Plugins MUST NEVER crash the kernel.
 
-All exceptions MUST be caught internally and returned as:
+All exceptions MUST be handled internally:
 
 SkillOutput.error("message")
+13. DESIGN PHILOSOPHY
 
-12. DESIGN PHILOSOPHY
-
-The Jarvis system is built on:
+Jarvis is built on:
 
 modular intelligence
-isolated execution
+controlled execution
 predictable contracts
 safe extensibility
+marketplace scalability
 
-Plugins are NOT autonomous systems.
+Plugins are NOT autonomous agents.
 
-Plugins are controlled execution units.
+They are controlled functional extensions of a deterministic kernel.
 
-13. FINAL RULE
+14. FINAL RULE
 
-If a plugin violates this standard, it is considered invalid and will be rejected by the loader without execution.
+If a plugin violates this standard:
 
-Every plugin MUST follow this directory structure:
-
+It is INVALID and will be rejected without execution.
